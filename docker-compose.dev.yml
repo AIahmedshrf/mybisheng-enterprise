@@ -1,383 +1,386 @@
-
-
-
-## 📄 الملف 33: `docker-compose.dev.yml`
-
-##```yaml
-# ============================================
+# ========================================
 # Bisheng Enterprise - Development Environment
-# ============================================
+# ========================================
+# إعدادات خاصة ببيئة التطوير (Codespace)
+# الاستخدام: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# ========================================
+
 version: '3.8'
 
-# ============================================
-# Networks
-# ============================================
-networks:
-  bisheng-dev-network:
-    driver: bridge
-
-# ============================================
-# Volumes
-# ============================================
-volumes:
-  postgres-dev-data:
-  redis-dev-data:
-  milvus-dev-data:
-  elasticsearch-dev-data:
-  minio-dev-data:
-  etcd-dev-data:
-
-# ============================================
-# Services
-# ============================================
 services:
-  # ============================================
-  # PostgreSQL (Development)
-  # ============================================
+
+  # ==================== PostgreSQL (Dev Overrides) ====================
   postgres:
-    image: postgres:15-alpine
-    container_name: bisheng-dev-postgres
-    restart: unless-stopped
     environment:
-      POSTGRES_DB: bisheng_dev
-      POSTGRES_USER: bisheng_dev
-      POSTGRES_PASSWORD: dev_password_123
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
-    volumes:
-      - postgres-dev-data:/var/lib/postgresql/data
-      - ./dev-scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
-    ports:
-      - "5432:5432"
-    networks:
-      - bisheng-dev-network
-    command: 
-      - "postgres"
-      - "-c"
-      - "log_statement=all"
-      - "-c"
-      - "log_duration=on"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bisheng_dev -d bisheng_dev"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
+      POSTGRES_DB: ${POSTGRES_DB:-bisheng_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-bisheng}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_postgres_pass_123}
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2g
+        reservations:
+          cpus: '0.5'
+          memory: 1g
+    
+    # إضافة pgAdmin للتطوير (اختياري)
+    labels:
+      - "dev.bisheng.service=database"
+      - "dev.bisheng.type=core"
 
-  # ============================================
-  # Redis (Development)
-  # ============================================
+  # ==================== Redis (Dev Overrides) ====================
   redis:
-    image: redis:7.2-alpine
-    container_name: bisheng-dev-redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes --loglevel debug
-    volumes:
-      - redis-dev-data:/data
-    ports:
-      - "6379:6379"
-    networks:
-      - bisheng-dev-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  # ============================================
-  # MinIO (Development)
-  # ============================================
-  minio:
-    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
-    container_name: bisheng-dev-minio
-    restart: unless-stopped
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin123
-    volumes:
-      - minio-dev-data:/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    networks:
-      - bisheng-dev-network
-    command: server /data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  # ============================================
-  # Etcd (Development)
-  # ============================================
-  etcd:
-    image: quay.io/coreos/etcd:v3.5.5
-    container_name: bisheng-dev-etcd
-    restart: unless-stopped
-    environment:
-      ETCD_AUTO_COMPACTION_MODE: revision
-      ETCD_AUTO_COMPACTION_RETENTION: 1000
-    volumes:
-      - etcd-dev-data:/etcd
-    networks:
-      - bisheng-dev-network
     command: >
-      etcd
-      -advertise-client-urls=http://127.0.0.1:2379
-      -listen-client-urls=http://0.0.0.0:2379
-      --data-dir=/etcd
-    healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-dev_redis_pass_123}
+      --maxmemory ${REDIS_MAXMEMORY:-1gb}
+      --maxmemory-policy ${REDIS_MAXMEMORY_POLICY:-allkeys-lru}
+      --appendonly no
+      --save ""
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1g
+        reservations:
+          cpus: '0.25'
+          memory: 512m
+    
+    labels:
+      - "dev.bisheng.service=cache"
+      - "dev.bisheng.type=core"
 
-  # ============================================
-  # Milvus (Development)
-  # ============================================
-  milvus:
-    image: milvusdb/milvus:v2.5.10
-    container_name: bisheng-dev-milvus
-    restart: unless-stopped
-    environment:
-      ETCD_ENDPOINTS: etcd:2379
-      MINIO_ADDRESS: minio:9000
-      MINIO_ACCESS_KEY_ID: minioadmin
-      MINIO_SECRET_ACCESS_KEY: minioadmin123
-    volumes:
-      - milvus-dev-data:/var/lib/milvus
-    ports:
-      - "19530:19530"
-      - "9091:9091"
-    networks:
-      - bisheng-dev-network
-    command: ["milvus", "run", "standalone"]
-    depends_on:
-      etcd:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ============================================
-  # Elasticsearch (Development)
-  # ============================================
+  # ==================== Elasticsearch (Dev Overrides) ====================
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
-    container_name: bisheng-dev-elasticsearch
-    restart: unless-stopped
     environment:
-      discovery.type: single-node
-      xpack.security.enabled: "false"
-      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
-    volumes:
-      - elasticsearch-dev-data:/usr/share/elasticsearch/data
-    ports:
-      - "9200:9200"
-    networks:
-      - bisheng-dev-network
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - bootstrap.memory_lock=false
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1g
+        reservations:
+          cpus: '0.5'
+          memory: 512m
+    
+    labels:
+      - "dev.bisheng.service=search"
+      - "dev.bisheng.type=core"
 
-  # ============================================
-  # Bisheng Backend (Development - Hot Reload)
-  # ============================================
-  backend:
-    build:
-      context: ./src/backend
-      dockerfile: Dockerfile.dev
-    container_name: bisheng-dev-backend
-    restart: unless-stopped
+  # ==================== Milvus (Dev Overrides) ====================
+  milvus:
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2g
+        reservations:
+          cpus: '0.5'
+          memory: 1g
+    
+    labels:
+      - "dev.bisheng.service=vectordb"
+      - "dev.bisheng.type=core"
+
+  # ==================== MinIO (Dev Overrides) ====================
+  minio:
     environment:
-      # Development mode
-      ENVIRONMENT: development
-      DEBUG: "true"
-      LOG_LEVEL: DEBUG
-      
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      MINIO_BROWSER: "on"
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512m
+        reservations:
+          cpus: '0.25'
+          memory: 256m
+    
+    labels:
+      - "dev.bisheng.service=storage"
+      - "dev.bisheng.type=core"
+
+  # ==================== Backend (Dev Overrides) ====================
+  backend:
+    environment:
       # Database
-      DATABASE_URL: postgresql://bisheng_dev:dev_password_123@postgres:5432/bisheng_dev
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-bisheng_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-bisheng}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_postgres_pass_123}
       
       # Redis
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/1
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-dev_redis_pass_123}
       
-      # Milvus
-      MILVUS_HOST: milvus
-      MILVUS_PORT: 19530
-      
-      # Elasticsearch
-      ELASTICSEARCH_URL: http://elasticsearch:9200
-      
-      # MinIO
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin123
-      MINIO_BUCKET: bisheng-dev
-      
-      # Development settings
-      RELOAD: "true"
-      WORKERS: 1
-      
-      # API Keys (development - use your own)
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-dev-key}
-      
-    volumes:
-      # Mount source code for hot reload
-      - ./src/backend:/app
-      - ./configs/bisheng:/app/bisheng/config:ro
-      - dev-cache:/app/cache
-    ports:
-      - "7860:7860"
-      - "5678:5678"  # Debug port
-    networks:
-      - bisheng-dev-network
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      milvus:
-        condition: service_healthy
-      elasticsearch:
-        condition: service_healthy
-    command: >
-      uvicorn bisheng.main:app
-      --host 0.0.0.0
-      --port 7860
-      --reload
-      --log-level debug
-
-  # ============================================
-  # Bisheng Worker (Development)
-  # ============================================
-  worker:
-    build:
-      context: ./src/backend
-      dockerfile: Dockerfile.dev
-    container_name: bisheng-dev-worker
-    restart: unless-stopped
-    environment:
-      ENVIRONMENT: development
+      # Development specific
       DEBUG: "true"
       LOG_LEVEL: DEBUG
-      DATABASE_URL: postgresql://bisheng_dev:dev_password_123@postgres:5432/bisheng_dev
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/1
-      MILVUS_HOST: milvus
-      ELASTICSEARCH_URL: http://elasticsearch:9200
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin123
+      ENVIRONMENT: development
+      HOT_RELOAD: "true"
+      
+      # API Keys (استخدم مفاتيحك هنا)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    
+    # تمكين Hot Reload
     volumes:
-      - ./src/backend:/app
-      - dev-cache:/app/cache
-    networks:
-      - bisheng-dev-network
-    depends_on:
-      - postgres
-      - redis
-      - milvus
-    command: >
-      celery -A bisheng.worker worker
-      --loglevel=debug
-      --concurrency=2
+      - ./src/backend:/app:cached
+      - ./data/bisheng:/app/data
+      - ./logs/backend:/app/logs
+      - ./configs/bisheng:/app/config:ro
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 3g
+        reservations:
+          cpus: '0.5'
+          memory: 1g
+    
+    labels:
+      - "dev.bisheng.service=api"
+      - "dev.bisheng.type=app"
+      - "dev.bisheng.hot-reload=enabled"
 
-  # ============================================
-  # Bisheng Frontend (Development - Hot Reload)
-  # ============================================
+  # ==================== Frontend (Dev Overrides) ====================
   frontend:
-    build:
-      context: ./src/frontend
-      dockerfile: Dockerfile.dev
-    container_name: bisheng-dev-frontend
-    restart: unless-stopped
     environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3001}
+      VITE_APP_TITLE: "Bisheng Enterprise (Dev)"
       NODE_ENV: development
-      REACT_APP_API_URL: http://localhost:7860/api/v1
       CHOKIDAR_USEPOLLING: "true"
+    
+    # تمكين Hot Reload
     volumes:
-      # Mount source code for hot reload
-      - ./src/frontend:/app
-      - /app/node_modules  # Prevent node_modules override
-    ports:
-      - "3000:3000"
-    networks:
-      - bisheng-dev-network
-    depends_on:
-      - backend
-    command: npm start
+      - ./src/frontend:/app:cached
+      - ./logs/frontend:/app/logs
+      - /app/node_modules
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512m
+        reservations:
+          cpus: '0.25'
+          memory: 256m
+    
+    labels:
+      - "dev.bisheng.service=ui"
+      - "dev.bisheng.type=app"
+      - "dev.bisheng.hot-reload=enabled"
 
-  # ============================================
-  # Flower (Celery Monitoring)
-  # ============================================
-  flower:
-    build:
-      context: ./src/backend
-      dockerfile: Dockerfile.dev
-    container_name: bisheng-dev-flower
-    restart: unless-stopped
+  # ==================== Nginx (Dev Overrides) ====================
+  nginx:
+    volumes:
+      - ./configs/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./configs/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./logs/nginx:/var/log/nginx
+    
+    labels:
+      - "dev.bisheng.service=proxy"
+      - "dev.bisheng.type=infrastructure"
+
+  # ==================== Prometheus (Dev) ====================
+  prometheus:
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--log.level=info'
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1g
+    
+    labels:
+      - "dev.bisheng.service=metrics"
+      - "dev.bisheng.type=monitoring"
+
+  # ==================== Grafana (Dev) ====================
+  grafana:
     environment:
-      CELERY_BROKER_URL: redis://redis:6379/1
-    ports:
-      - "5555:5555"
-    networks:
-      - bisheng-dev-network
-    depends_on:
-      - redis
-    command: >
-      celery -A bisheng.worker flower
-      --port=5555
-      --broker=redis://redis:6379/1
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "true"
+      GF_SERVER_ROOT_URL: http://localhost:${GRAFANA_PORT:-3002}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_INSTALL_PLUGINS: redis-datasource
+      GF_LOG_LEVEL: info
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512m
+    
+    labels:
+      - "dev.bisheng.service=dashboard"
+      - "dev.bisheng.type=monitoring"
 
-  # ============================================
-  # Adminer (Database Management)
-  # ============================================
-  adminer:
-    image: adminer:latest
-    container_name: bisheng-dev-adminer
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    networks:
-      - bisheng-dev-network
-    environment:
-      ADMINER_DEFAULT_SERVER: postgres
-
-  # ============================================
-  # Redis Commander (Redis Management)
-  # ============================================
+  # ==================== Redis Commander (Dev Tool) ====================
   redis-commander:
     image: rediscommander/redis-commander:latest
-    container_name: bisheng-dev-redis-commander
-    restart: unless-stopped
+    container_name: bisheng-redis-commander
+    hostname: redis-commander
+    restart: ${RESTART_POLICY:-unless-stopped}
+    
     environment:
-      REDIS_HOSTS: local:redis:6379
+      REDIS_HOSTS: local:redis:6379:0:${REDIS_PASSWORD:-dev_redis_pass_123}
+      HTTP_USER: admin
+      HTTP_PASSWORD: admin
+    
     ports:
       - "8081:8081"
+    
     networks:
-      - bisheng-dev-network
+      - bisheng-network
+    
     depends_on:
       - redis
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256m
+    
+    labels:
+      - "dev.bisheng.service=redis-ui"
+      - "dev.bisheng.type=devtool"
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
 
-  # ============================================
-  # MailHog (Email Testing)
-  # ============================================
+  # ==================== Adminer (Database UI) ====================
+  adminer:
+    image: adminer:latest
+    container_name: bisheng-adminer
+    hostname: adminer
+    restart: ${RESTART_POLICY:-unless-stopped}
+    
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: nette
+    
+    ports:
+      - "8082:8080"
+    
+    networks:
+      - bisheng-network
+    
+    depends_on:
+      - postgres
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256m
+    
+    labels:
+      - "dev.bisheng.service=db-ui"
+      - "dev.bisheng.type=devtool"
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+
+  # ==================== Mailhog (Email Testing) ====================
   mailhog:
     image: mailhog/mailhog:latest
-    container_name: bisheng-dev-mailhog
-    restart: unless-stopped
+    container_name: bisheng-mailhog
+    hostname: mailhog
+    restart: ${RESTART_POLICY:-unless-stopped}
+    
     ports:
       - "1025:1025"  # SMTP
       - "8025:8025"  # Web UI
+    
     networks:
-      - bisheng-dev-network
+      - bisheng-network
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128m
+    
+    labels:
+      - "dev.bisheng.service=mail"
+      - "dev.bisheng.type=devtool"
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
 
+  # ==================== Portainer (Docker UI - Optional) ====================
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: bisheng-portainer
+    hostname: portainer
+    restart: ${RESTART_POLICY:-unless-stopped}
+    
+    command: -H unix:///var/run/docker.sock
+    
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    
+    networks:
+      - bisheng-network
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256m
+    
+    labels:
+      - "dev.bisheng.service=docker-ui"
+      - "dev.bisheng.type=devtool"
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+
+# ==================== Volumes الإضافية للتطوير ====================
 volumes:
-  dev-cache:
-    driver: local
+  portainer_data:
+    name: bisheng_dev_portainer_data
+
+# EOF

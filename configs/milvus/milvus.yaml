@@ -1,109 +1,232 @@
-# ============================================
-# Milvus Configuration
-# Bisheng Enterprise
-# ============================================
+# ========================================
+# Bisheng Enterprise - Milvus Configuration
+# ========================================
+# Vector Database Configuration
+# ========================================
 
-# Cluster settings
-cluster:
-  enable: false
-
-# Etcd settings
+# ==================== Etcd Configuration ====================
 etcd:
   endpoints:
     - etcd:2379
   rootPath: bisheng-milvus
   metaSubPath: meta
   kvSubPath: kv
+  log:
+    level: info
+    path: /var/log/milvus/etcd.log
 
-# MinIO/S3 settings
+# ==================== MinIO/S3 Configuration ====================
 minio:
   address: minio
   port: 9000
-  accessKeyID: bisheng_admin
-  secretAccessKey: BiSheng@2024!MinIO#Secure
+  accessKeyID: minioadmin
+  secretAccessKey: minioadmin123
   useSSL: false
   bucketName: milvus-bucket
-  rootPath: files
+  rootPath: file
+  useIAM: false
+  cloudProvider: minio
+  iamEndpoint: ""
+  logLevel: info
 
-# Storage settings
-localStorage:
-  path: /var/lib/milvus/data
-
-# Common settings
+# ==================== Common Configuration ====================
 common:
   chanNamePrefix:
-    cluster: "bisheng-milvus"
-    rootCoordTimeTick: "rootcoord-timetick"
-    rootCoordStatistics: "rootcoord-statistics"
-    rootCoordDml: "rootcoord-dml"
-    rootCoordDelta: "rootcoord-delta"
-    search: "search"
-    searchResult: "searchResult"
-    queryTimeTick: "queryTimeTick"
-  
-  # Graceful stop timeout
+    cluster: bisheng
+    rootCoordTimeTick: rootcoord-timetick
+    queryTimeTick: queryTimeTick
+  subNamePrefix:
+    commonSubNamePrefix: bisheng-sub
+  gracefulTime: 5000
   gracefulStopTimeout: 30
+  preCreatedTopicEnabled: true
+  topicNames: []
+  timeTick:
+    interval: 200
 
-# Root coordinator settings
+# ==================== Root Coordinator ====================
 rootCoord:
+  address: localhost
+  port: 53100
+  grpc:
+    serverMaxRecvSize: 536870912  # 512MB
+    serverMaxSendSize: 536870912  # 512MB
+    clientMaxRecvSize: 104857600  # 100MB
+    clientMaxSendSize: 104857600  # 100MB
   dmlChannelNum: 16
   maxPartitionNum: 4096
   minSegmentSizeToEnableIndex: 1024
+  importTaskExpiration: 900
+  importTaskRetention: 86400
+  importMaxPendingTaskCount: 32
 
-# Query node settings
-queryNode:
-  gracefulStopTimeout: 30
-  stats:
-    publishInterval: 1000
-  
-  # Cache settings
-  cacheSize: 33554432 # 32GB in bytes
-  
-  # Search settings
-  search:
-    receiveChannel: search
-    resultChannel: searchResult
-    topKLimit: 16384
-    searchListSize: 100
-
-# Index node settings
-indexNode:
-  scheduler:
-    buildParallel: 1
-
-# Data node settings
-dataNode:
-  flush:
-    insertBufSize: 16777216 # 16MB
-
-# Proxy settings
+# ==================== Proxy ====================
 proxy:
+  port: 19530
+  grpc:
+    serverMaxRecvSize: 536870912  # 512MB
+    serverMaxSendSize: 536870912  # 512MB
+    clientMaxRecvSize: 104857600  # 100MB
+    clientMaxSendSize: 104857600  # 100MB
   timeTickInterval: 200
   msgStream:
     timeTick:
       bufSize: 512
-  
-  # Max size of each insert message
   maxNameLength: 255
-  maxFieldNum: 256
+  maxUsernameLength: 32
+  minPasswordLength: 6
+  maxPasswordLength: 256
+  maxFieldNum: 64
   maxDimension: 32768
-  
-  # HTTP server port
-  http:
-    enabled: true
-    port: 9091
+  maxShardNum: 16
+  maxTaskNum: 10240
+  ginLogging: true
+  maxUserNum: 100
+  maxRoleNum: 10
 
-# Log settings
+# ==================== Query Coordinator ====================
+queryCoord:
+  address: localhost
+  port: 19531
+  autoHandoff: true
+  autoBalance: true
+  balanceIntervalSeconds: 60
+  memoryUsageMaxDifferencePercentage: 30
+  checkInterval: 1000
+  channelTaskTimeout: 60000
+  segmentTaskTimeout: 120000
+  distPullInterval: 500
+  loadTimeoutSeconds: 600
+  grpc:
+    serverMaxRecvSize: 536870912
+    serverMaxSendSize: 536870912
+    clientMaxRecvSize: 104857600
+    clientMaxSendSize: 104857600
+
+# ==================== Query Node ====================
+queryNode:
+  cacheSize: 32
+  gracefulStopTimeout: 30
+  port: 21123
+  grpc:
+    serverMaxRecvSize: 536870912
+    serverMaxSendSize: 536870912
+    clientMaxRecvSize: 104857600
+    clientMaxSendSize: 104857600
+  stats:
+    publishInterval: 1000
+  dataSync:
+    flowGraph:
+      maxQueueLength: 16
+      maxParallelism: 1024
+  scheduler:
+    receiveChanSize: 10240
+    unsolvedQueueSize: 10240
+    maxReadConcurrency: 0
+  segcore:
+    chunkRows: 128
+    enableChunkCache: true
+    smallIndexNlist: 128
+    smallIndexNprobe: 16
+
+# ==================== Data Coordinator ====================
+dataCoord:
+  address: localhost
+  port: 13333
+  enableCompaction: true
+  enableGarbageCollection: true
+  gc:
+    interval: 3600
+    missingTolerance: 86400
+    dropTolerance: 86400
+  segment:
+    maxSize: 1024
+    sealProportion: 0.75
+    assignmentExpiration: 2000
+    maxLife: 86400
+    maxIdleTime: 600
+  grpc:
+    serverMaxRecvSize: 536870912
+    serverMaxSendSize: 536870912
+    clientMaxRecvSize: 104857600
+    clientMaxSendSize: 104857600
+
+# ==================== Data Node ====================
+dataNode:
+  port: 21124
+  grpc:
+    serverMaxRecvSize: 536870912
+    serverMaxSendSize: 536870912
+    clientMaxRecvSize: 104857600
+    clientMaxSendSize: 104857600
+  dataSync:
+    flowGraph:
+      maxQueueLength: 16
+      maxParallelism: 1024
+  flush:
+    insertBufSize: 16777216
+
+# ==================== Index Coordinator ====================
+indexCoord:
+  address: localhost
+  port: 31000
+  gc:
+    interval: 600
+  scheduler:
+    interval: 1000
+  grpc:
+    serverMaxRecvSize: 536870912
+    serverMaxSendSize: 536870912
+    clientMaxRecvSize: 104857600
+    clientMaxSendSize: 104857600
+
+# ==================== Index Node ====================
+indexNode:
+  port: 21121
+  enableDisk: true
+  maxDiskUsagePercentage: 95
+  grpc:
+    serverMaxRecvSize: 536870912
+    serverMaxSendSize: 536870912
+    clientMaxRecvSize: 104857600
+    clientMaxSendSize: 104857600
+
+# ==================== Message Queue ====================
+pulsar:
+  address: pulsar
+  port: 6650
+  maxMessageSize: 5242880
+
+rocksmq:
+  path: /var/lib/milvus/rdb_data
+  lrucacheratio: 0.06
+  rocksmqPageSize: 67108864
+  retentionTimeInMinutes: 4320
+  retentionSizeInMB: 8192
+  compactionInterval: 86400
+  compressionTypes: [0, 0, 7, 7, 7]
+
+natsmq:
+  server:
+    port: 4222
+    storeDir: /var/lib/milvus/nats
+    maxFileStore: 17179869184
+    maxPayload: 8388608
+    initializeTimeout: 4000
+
+# ==================== Log Configuration ====================
 log:
   level: info
   file:
-    rootPath: /var/lib/milvus/logs
+    rootPath: /var/log/milvus
     maxSize: 300
     maxAge: 10
     maxBackups: 20
   format: text
 
-# Metrics settings
-metrics:
-  port: 9091
-  enableProfiling: false
+# ==================== GPU Configuration ====================
+gpu:
+  initMemSize: 0
+  maxMemSize: 0
+
+# EOF

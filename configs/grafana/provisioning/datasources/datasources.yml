@@ -1,13 +1,13 @@
-# ============================================
-# Grafana Datasources Configuration
-# ============================================
+# ========================================
+# Bisheng Enterprise - Grafana Datasources
+# ========================================
+# Auto-provisioned data sources
+# ========================================
 
 apiVersion: 1
 
 datasources:
-  # ============================================
-  # Prometheus
-  # ============================================
+  # ==================== Prometheus ====================
   - name: Prometheus
     type: prometheus
     access: proxy
@@ -15,57 +15,58 @@ datasources:
     isDefault: true
     editable: true
     jsonData:
+      httpMethod: POST
       timeInterval: 15s
       queryTimeout: 60s
+      manageAlerts: true
+      prometheusType: Prometheus
+      prometheusVersion: 2.48.0
+      cacheLevel: High
+      incrementalQuerying: true
+      incrementalQueryOverlapWindow: 10m
+      disableRecordingRules: false
     version: 1
 
-  # ============================================
-  # PostgreSQL
-  # ============================================
+  # ==================== PostgreSQL ====================
   - name: PostgreSQL
     type: postgres
     access: proxy
     url: postgres:5432
-    database: bisheng
-    user: bisheng_user
+    database: bisheng_dev
+    user: bisheng
     secureJsonData:
-      password: 'BiSheng@2024!Secure#PG'
+      password: 'dev_postgres_pass_123'
     jsonData:
-      sslmode: 'disable'
+      sslmode: disable
       maxOpenConns: 10
-      maxIdleConns: 10
+      maxIdleConns: 5
       connMaxLifetime: 14400
+      postgresVersion: 1500
+      timescaledb: false
     editable: true
     version: 1
 
-  # ============================================
-  # Redis
-  # ============================================
+  # ==================== Redis (via Prometheus) ====================
   - name: Redis
-    type: redis-datasource
+    type: prometheus
     access: proxy
-    url: redis:6379
-    secureJsonData:
-      password: 'BiSheng@2024!Redis#Secure'
+    url: http://prometheus:9090
     editable: true
+    jsonData:
+      httpMethod: POST
+      manageAlerts: false
+      prometheusType: Prometheus
     version: 1
 
-  # ============================================
-  # Elasticsearch
-  # ============================================
-  - name: Elasticsearch
-    type: elasticsearch
-    access: proxy
-    url: http://elasticsearch:9200
-    database: '[logs-]YYYY.MM.DD'
-    basicAuth: true
-    basicAuthUser: elastic
-    secureJsonData:
-      basicAuthPassword: 'BiSheng@2024!ES#Secure'
-    jsonData:
-      esVersion: '8.0.0'
-      timeField: '@timestamp'
-      logMessageField: message
-      logLevelField: level
-    editable: true
-    version: 1
+  # ==================== Loki (Optional - for logs) ====================
+  # Uncomment when Loki is added
+  # - name: Loki
+  #   type: loki
+  #   access: proxy
+  #   url: http://loki:3100
+  #   editable: true
+  #   jsonData:
+  #     maxLines: 1000
+  #   version: 1
+
+# EOF

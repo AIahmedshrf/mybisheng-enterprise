@@ -1,0 +1,234 @@
+# ========================================
+# Bisheng Enterprise - Backend Configuration
+# ========================================
+# Application Settings
+# ========================================
+
+# ==================== Application ====================
+app:
+  name: "Bisheng Enterprise"
+  version: "1.0.0"
+  environment: "development"
+  debug: true
+  timezone: "Asia/Riyadh"
+
+# ==================== Server ====================
+server:
+  host: "0.0.0.0"
+  port: 3001
+  workers: 4
+  reload: true
+  log_level: "INFO"
+  access_log: true
+  cors:
+    enabled: true
+    origins: ["*"]
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    headers: ["*"]
+
+# ==================== Database ====================
+database:
+  type: "postgresql"
+  host: "postgres"
+  port: 5432
+  name: "bisheng_dev"
+  user: "bisheng"
+  password: "dev_postgres_pass_123"
+  pool:
+    min_size: 5
+    max_size: 20
+    max_overflow: 10
+    timeout: 30
+    recycle: 3600
+  echo: false
+  echo_pool: false
+
+# ==================== Cache (Redis) ====================
+cache:
+  type: "redis"
+  host: "redis"
+  port: 6379
+  password: "dev_redis_pass_123"
+  db: 0
+  pool:
+    max_connections: 50
+    timeout: 5
+  ttl: 3600
+  key_prefix: "bisheng:"
+
+# ==================== Vector Database (Milvus) ====================
+vector_db:
+  type: "milvus"
+  host: "milvus"
+  port: 19530
+  collection_name: "bisheng_embeddings"
+  dimension: 768
+  index_type: "IVF_FLAT"
+  metric_type: "L2"
+  nlist: 1024
+
+# ==================== Search (Elasticsearch) ====================
+search:
+  type: "elasticsearch"
+  hosts: ["elasticsearch:9200"]
+  index_prefix: "bisheng"
+  timeout: 30
+  max_retries: 3
+  retry_on_timeout: true
+
+# ==================== Storage (MinIO) ====================
+storage:
+  type: "minio"
+  endpoint: "minio:9000"
+  access_key: "minioadmin"
+  secret_key: "minioadmin123"
+  bucket: "bisheng-dev"
+  secure: false
+  region: "us-east-1"
+
+# ==================== Authentication ====================
+auth:
+  jwt:
+    secret: "dev-jwt-secret-not-for-production-use"
+    algorithm: "HS256"
+    expire_minutes: 43200
+  password:
+    min_length: 8
+    require_uppercase: true
+    require_lowercase: true
+    require_digits: true
+    require_special: false
+  session:
+    cookie_name: "bisheng_session"
+    secret_key: "dev-session-secret"
+    max_age: 86400
+
+# ==================== AI Models ====================
+models:
+  # OpenAI
+  openai:
+    api_key: "${OPENAI_API_KEY}"
+    base_url: "https://api.openai.com/v1"
+    default_model: "gpt-3.5-turbo"
+    embedding_model: "text-embedding-ada-002"
+    max_tokens: 4000
+    temperature: 0.7
+  
+  # Local Models
+  local:
+    enabled: true
+    model_path: "/models"
+    embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    llm_model: "chatglm3-6b"
+  
+  # Model Settings
+  settings:
+    max_retries: 3
+    timeout: 60
+    chunk_size: 1000
+    chunk_overlap: 200
+
+# ==================== Document Processing ====================
+document:
+  allowed_extensions:
+    - "pdf"
+    - "doc"
+    - "docx"
+    - "txt"
+    - "md"
+    - "html"
+    - "ppt"
+    - "pptx"
+    - "xls"
+    - "xlsx"
+  max_file_size: 104857600  # 100MB
+  ocr:
+    enabled: true
+    languages: ["eng", "ara", "chi_sim"]
+  processing:
+    batch_size: 10
+    parallel_workers: 4
+    timeout: 300
+
+# ==================== Monitoring ====================
+monitoring:
+  prometheus:
+    enabled: true
+    port: 3001
+    path: "/metrics"
+  health_check:
+    enabled: true
+    path: "/health"
+  
+# ==================== Logging ====================
+logging:
+  level: "INFO"
+  format: "json"
+  handlers:
+    console:
+      enabled: true
+      level: "INFO"
+    file:
+      enabled: true
+      level: "INFO"
+      path: "/app/logs/bisheng.log"
+      max_bytes: 10485760  # 10MB
+      backup_count: 10
+      rotation: "time"
+      when: "midnight"
+  loggers:
+    uvicorn: "INFO"
+    sqlalchemy: "WARNING"
+    milvus: "INFO"
+
+# ==================== Rate Limiting ====================
+rate_limit:
+  enabled: true
+  default_limit: "60/minute"
+  storage: "redis"
+  key_prefix: "rate_limit:"
+  strategy: "fixed-window"
+
+# ==================== Features ====================
+features:
+  file_upload: true
+  chat: true
+  document_analysis: true
+  embeddings: true
+  fine_tuning: false
+  api_access: true
+  webhooks: false
+
+# ==================== Webhooks ====================
+webhooks:
+  enabled: false
+  timeout: 30
+  max_retries: 3
+  events:
+    - "document.processed"
+    - "chat.completed"
+    - "error.occurred"
+
+# ==================== Background Tasks ====================
+tasks:
+  celery:
+    broker_url: "redis://redis:6379/1"
+    result_backend: "redis://redis:6379/2"
+    task_serializer: "json"
+    result_serializer: "json"
+    accept_content: ["json"]
+    timezone: "Asia/Riyadh"
+    enable_utc: true
+
+# ==================== Email ====================
+email:
+  smtp:
+    host: "mailhog"
+    port: 1025
+    use_tls: false
+    username: ""
+    password: ""
+  from_email: "noreply@bisheng.local"
+  from_name: "Bisheng Enterprise"
+
+# EOF
