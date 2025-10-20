@@ -1,65 +1,17 @@
-# ========================================
-# Bisheng Enterprise - Elasticsearch Configuration
-# ========================================
-# Search Engine Configuration
-# ========================================
+# Bisheng Enterprise - Elasticsearch 8.x Configuration
 
-# ==================== Cluster ====================
 cluster.name: bisheng-cluster
 node.name: bisheng-node-1
 
-# ==================== Paths ====================
 path.data: /usr/share/elasticsearch/data
 path.logs: /usr/share/elasticsearch/logs
 
-# ==================== Network ====================
 network.host: 0.0.0.0
 http.port: 9200
-transport.port: 9300
 
-# ==================== Discovery ====================
 discovery.type: single-node
-cluster.initial_master_nodes: ["bisheng-node-1"]
 
-# ==================== HTTP ====================
 http.cors.enabled: true
 http.cors.allow-origin: "*"
-http.cors.allow-headers: "X-Requested-With,Content-Type,Content-Length,Authorization"
 
-# ==================== Security ====================
 xpack.security.enabled: false
-xpack.security.http.ssl.enabled: false
-xpack.security.transport.ssl.enabled: false
-
-# ==================== Monitoring ====================
-xpack.monitoring.enabled: true
-xpack.monitoring.collection.enabled: true
-
-# ==================== Performance ====================
-bootstrap.memory_lock: false
-indices.memory.index_buffer_size: 30%
-indices.queries.cache.size: 10%
-indices.fielddata.cache.size: 20%
-
-# ==================== Thread Pools ====================
-thread_pool.write.queue_size: 1000
-thread_pool.search.queue_size: 1000
-
-# ==================== Index Settings ====================
-action.auto_create_index: true
-action.destructive_requires_name: true
-
-# ==================== Arabic & Chinese Support ====================
-# Plugins for multilingual support should be installed
-index.analysis.analyzer.default.type: standard
-index.analysis.analyzer.default.stopwords: _none_
-
-# Custom analyzers (will be applied per index)
-# For Arabic: icu_analyzer, arabic analyzer
-# For Chinese: ik_max_word, ik_smart
-
-# ==================== Logging ====================
-logger.level: INFO
-logger.org.elasticsearch.discovery: INFO
-
-# EOF
