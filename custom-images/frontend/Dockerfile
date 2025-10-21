@@ -19,27 +19,27 @@ ENV NODE_ENV=production \
 # ============================================
 USER root
 
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     bash \
-    && rm -rf /var/cache/apk/*
+    && rm -rf /var/lib/apt/lists/* && apt-get clean
 
 # ============================================
 # Security Headers & Configuration
 # ============================================
-COPY security-headers.conf /etc/nginx/conf.d/security-headers.conf
+COPY custom-images/frontend/security-headers.conf /etc/nginx/conf.d/security-headers.conf
 
 # ============================================
 # Health Check Script
 # ============================================
-COPY healthcheck.sh /usr/local/bin/healthcheck-frontend.sh
+COPY custom-images/frontend/healthcheck.sh /usr/local/bin/healthcheck-frontend.sh
 RUN chmod +x /usr/local/bin/healthcheck-frontend.sh
 
 # ============================================
 # Custom Entrypoint
 # ============================================
-COPY entrypoint-frontend.sh /usr/local/bin/entrypoint-frontend.sh
+COPY custom-images/frontend/entrypoint-frontend.sh /usr/local/bin/entrypoint-frontend.sh
 RUN chmod +x /usr/local/bin/entrypoint-frontend.sh
 
 # ============================================

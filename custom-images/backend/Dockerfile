@@ -56,7 +56,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Network tools
     curl \
     wget \
-    netcat \
+    netcat-openbsd \
     # Utilities
     git \
     unzip \
@@ -172,13 +172,13 @@ RUN mkdir -p /app/cache/{transformers,huggingface,torch,models} \
 # ============================================
 # Health Check Script
 # ============================================
-COPY healthcheck.sh /usr/local/bin/healthcheck.sh
+COPY custom-images/backend/healthcheck.sh /usr/local/bin/healthcheck.sh
 RUN chmod +x /usr/local/bin/healthcheck.sh
 
 # ============================================
 # Entrypoint Script
 # ============================================
-COPY entrypoint-enterprise.sh /usr/local/bin/entrypoint-enterprise.sh
+COPY custom-images/backend/entrypoint-enterprise.sh /usr/local/bin/entrypoint-enterprise.sh
 RUN chmod +x /usr/local/bin/entrypoint-enterprise.sh
 
 # ============================================
