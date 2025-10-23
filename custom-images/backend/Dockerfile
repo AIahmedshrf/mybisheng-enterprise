@@ -172,13 +172,13 @@ RUN mkdir -p /app/cache/{transformers,huggingface,torch,models} \
 # ============================================
 # Health Check Script
 # ============================================
-COPY custom-images/backend/healthcheck.sh /usr/local/bin/healthcheck.sh
+COPY healthcheck.sh /usr/local/bin/healthcheck.sh
 RUN chmod +x /usr/local/bin/healthcheck.sh
 
 # ============================================
 # Entrypoint Script
 # ============================================
-COPY custom-images/backend/entrypoint-enterprise.sh /usr/local/bin/entrypoint-enterprise.sh
+COPY entrypoint-enterprise.sh /usr/local/bin/entrypoint-enterprise.sh
 RUN chmod +x /usr/local/bin/entrypoint-enterprise.sh
 
 # ============================================

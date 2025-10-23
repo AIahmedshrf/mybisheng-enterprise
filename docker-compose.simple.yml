@@ -1,0 +1,134 @@
+version: '3.8'
+
+networks:
+  bisheng-network:
+    name: bisheng-network
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: bisheng-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bisheng
+      POSTGRES_USER: bisheng
+      POSTGRES_PASSWORD: changeme123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - bisheng-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bisheng"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7.2-alpine
+    container_name: bisheng-redis
+    restart: unless-stopped
+    command: redis-server --requirepass changeme123
+    ports:
+      - "6379:6379"
+    networks:
+      - bisheng-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: bisheng-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - bisheng-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Bisheng Backend
+  backend:
+    image: dataelement/bisheng-backend:latest
+    container_name: bisheng-backend
+    restart: unless-stopped
+    environment:
+      - BISHENG_ROLE=bisheng
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=bisheng
+      - POSTGRES_USER=bisheng
+      - POSTGRES_PASSWORD=changeme123
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=changeme123
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - BACKEND_URL=http://0.0.0.0:7860
+    ports:
+      - "7860:7860"
+    networks:
+      - bisheng-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./data/backend:/opt/bisheng/data
+      - ./logs/backend:/opt/bisheng/logs
+
+  # Bisheng Frontend
+  frontend:
+    image: dataelement/bisheng-frontend:latest
+    container_name: bisheng-frontend
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=http://localhost:7860
+    ports:
+      - "3001:3001"
+    networks:
+      - bisheng-network
+    depends_on:
+      - backend
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: bisheng-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    networks:
+      - bisheng-network
+    depends_on:
+      - backend
+      - frontend
+    volumes:
+      - ./configs/nginx/simple.conf:/etc/nginx/conf.d/default.conf:ro

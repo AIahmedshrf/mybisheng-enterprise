@@ -1,0 +1,6 @@
+# Bisheng Enterprise - Main Orchestrator
+# يجمع جميع الخدمات من الملفات المنفصلة
+
+include:
+  - base/docker-compose.base.yml
+  - infrastructure/docker-compose.monitoring.yml

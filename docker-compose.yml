@@ -1,20 +1,10 @@
-# ========================================
-# Bisheng Enterprise - Main Orchestrator
-# ========================================
-# الملف الرئيسي الذي يجمع جميع الخدمات
-# الاستخدام: docker-compose up -d
-# ========================================
-
-# ==================== الشبكات ====================
 networks:
   bisheng-network:
     name: ${NETWORK_NAME:-bisheng-network}
     driver: bridge
     ipam:
       config:
-        - subnet: ${NETWORK_SUBNET:-172.28.0.0/16}
-
-# ==================== Volumes ====================
+      - subnet: ${NETWORK_SUBNET:-172.28.0.0/16}
 volumes:
   postgres_data:
     name: bisheng_postgres_data
@@ -34,218 +24,186 @@ volumes:
     name: bisheng_grafana_data
   alertmanager_data:
     name: bisheng_alertmanager_data
-
-# ==================== الخدمات ====================
 services:
-  # ==================== PostgreSQL ====================
   postgres:
     image: postgres:${POSTGRES_VERSION:-15-alpine}
     container_name: bisheng-postgres
     hostname: postgres
     restart: ${RESTART_POLICY:-unless-stopped}
-    
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-bisheng}
       POSTGRES_USER: ${POSTGRES_USER:-bisheng}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C
       PGDATA: /var/lib/postgresql/data/pgdata
-    
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./configs/postgresql/postgresql.conf:/etc/postgresql/postgresql.conf:ro
-      - ./configs/postgresql/init-scripts:/docker-entrypoint-initdb.d:ro
-      - ./logs/postgresql:/var/log/postgresql
-    
+    - postgres_data:/var/lib/postgresql/data
+    - ./configs/postgresql/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    - ./configs/postgresql/init-scripts:/docker-entrypoint-initdb.d:ro
+    - ./logs/postgresql:/var/log/postgresql
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    
+    - ${POSTGRES_PORT:-5432}:5432
     networks:
-      - bisheng-network
-    
+    - bisheng-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bisheng} -d ${POSTGRES_DB:-bisheng}"]
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${POSTGRES_USER:-bisheng} -d ${POSTGRES_DB:-bisheng}
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
-    
     deploy:
       resources:
         limits:
-          cpus: '${POSTGRES_CPU_LIMIT:-2}'
+          cpus: ${POSTGRES_CPU_LIMIT:-2}
           memory: ${POSTGRES_MEM_LIMIT:-4g}
         reservations:
-          cpus: '${POSTGRES_CPU_RESERVATION:-1}'
+          cpus: ${POSTGRES_CPU_RESERVATION:-1}
           memory: ${POSTGRES_MEM_RESERVATION:-2g}
-    
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ==================== Redis ====================
+        max-size: 10m
+        max-file: '3'
   redis:
     image: redis:${REDIS_VERSION:-7.2-alpine}
     container_name: bisheng-redis
     hostname: redis
     restart: ${RESTART_POLICY:-unless-stopped}
-    
-    command: >
-      redis-server
-      --requirepass ${REDIS_PASSWORD:-changeme}
-      --maxmemory ${REDIS_MAXMEMORY:-2gb}
-      --maxmemory-policy ${REDIS_MAXMEMORY_POLICY:-allkeys-lru}
-      --appendonly yes
-      --appendfsync everysec
-    
+    command: 'redis-server --requirepass ${REDIS_PASSWORD:-changeme} --maxmemory ${REDIS_MAXMEMORY:-2gb}
+      --maxmemory-policy ${REDIS_MAXMEMORY_POLICY:-allkeys-lru} --appendonly yes --appendfsync
+      everysec
+
+      '
     volumes:
-      - redis_data:/data
-      - ./logs/redis:/var/log/redis
-    
+    - redis_data:/data
+    - ./logs/redis:/var/log/redis
     ports:
-      - "${REDIS_PORT:-6379}:6379"
-    
+    - ${REDIS_PORT:-6379}:6379
     networks:
-      - bisheng-network
-    
+    - bisheng-network
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test:
+      - CMD
+      - redis-cli
+      - --raw
+      - incr
+      - ping
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
-    
     deploy:
       resources:
         limits:
-          cpus: '${REDIS_CPU_LIMIT:-1}'
+          cpus: ${REDIS_CPU_LIMIT:-1}
           memory: ${REDIS_MEM_LIMIT:-4g}
         reservations:
-          cpus: '${REDIS_CPU_RESERVATION:-0.5}'
+          cpus: ${REDIS_CPU_RESERVATION:-0.5}
           memory: ${REDIS_MEM_RESERVATION:-2g}
-    
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ==================== Etcd ====================
+        max-size: 10m
+        max-file: '3'
   etcd:
     image: bitnamilegacy/etcd:3.5
     container_name: bisheng-etcd
     hostname: etcd
     restart: ${RESTART_POLICY:-unless-stopped}
-    
     environment:
-      ALLOW_NONE_AUTHENTICATION: "yes"
-      ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
-      ETCD_ADVERTISE_CLIENT_URLS: "http://etcd:2379"
-    
+      ALLOW_NONE_AUTHENTICATION: 'yes'
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
     volumes:
-      - etcd_data:/etcd
-    
+    - etcd_data:/etcd
     ports:
-      - "2379:2379"
-    
+    - 2379:2379
     networks:
-      - bisheng-network
-    
+    - bisheng-network
     healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health"]
+      test:
+      - CMD
+      - etcdctl
+      - endpoint
+      - health
       interval: 30s
       timeout: 10s
       retries: 3
-    
     deploy:
       resources:
         limits:
           cpus: '0.5'
           memory: 512m
-    
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ==================== MinIO ====================
+        max-size: 10m
+        max-file: '3'
   minio:
     image: minio/minio:${MINIO_VERSION:-latest}
     container_name: bisheng-minio
     hostname: minio
     restart: ${RESTART_POLICY:-unless-stopped}
-    
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_REGION: ${MINIO_REGION:-us-east-1}
-    
     command: server /data --console-address ":9001"
-    
     volumes:
-      - minio_data:/data
-      - ./logs/minio:/root/.minio/logs
-    
+    - minio_data:/data
+    - ./logs/minio:/root/.minio/logs
     ports:
-      - "${MINIO_PORT:-9003}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
-    
+    - ${MINIO_PORT:-9003}:9000
+    - ${MINIO_CONSOLE_PORT:-9001}:9001
     networks:
-      - bisheng-network
-    
+    - bisheng-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:9000/minio/health/live
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
-    
     deploy:
       resources:
         limits:
-          cpus: '${MINIO_CPU_LIMIT:-1}'
+          cpus: ${MINIO_CPU_LIMIT:-1}
           memory: ${MINIO_MEM_LIMIT:-2g}
         reservations:
-          cpus: '${MINIO_CPU_RESERVATION:-0.5}'
+          cpus: ${MINIO_CPU_RESERVATION:-0.5}
           memory: ${MINIO_MEM_RESERVATION:-1g}
-    
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ==================== Elasticsearch ====================
+        max-size: 10m
+        max-file: '3'
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:${ES_VERSION:-8.11.0}
     container_name: bisheng-elasticsearch
     hostname: elasticsearch
-    user: "1000:1000"
+    user: 1000:1000
     restart: ${RESTART_POLICY:-unless-stopped}
-    
     environment:
-      - discovery.type=single-node
-      - "ES_JAVA_OPTS=-Xms1g -Xmx1g -Xlog:disable"
-      - xpack.security.enabled=${ES_SECURITY_ENABLED:-false}
-      - xpack.security.http.ssl.enabled=false
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-changeme}
-      - bootstrap.memory_lock=false
-    
+    - discovery.type=single-node
+    - ES_JAVA_OPTS=-Xms1g -Xmx1g -Xlog:disable
+    - xpack.security.enabled=${ES_SECURITY_ENABLED:-false}
+    - xpack.security.http.ssl.enabled=false
+    - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-changeme}
+    - bootstrap.memory_lock=false
     volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
-      - ./configs/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
-      - ./logs/elasticsearch:/usr/share/elasticsearch/logs
-    
+    - elasticsearch_data:/usr/share/elasticsearch/data
+    - ./configs/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+    - ./logs/elasticsearch:/usr/share/elasticsearch/logs
     ports:
-      - "${ES_PORT:-9200}:9200"
-      - "9300:9300"
-    
+    - ${ES_PORT:-9200}:9200
+    - 9300:9300
     networks:
-      - bisheng-network
-    
+    - bisheng-network
     ulimits:
       memlock:
         soft: -1
@@ -253,89 +211,82 @@ services:
       nofile:
         soft: 65536
         hard: 65536
-    
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      test:
+      - CMD-SHELL
+      - curl -f http://localhost:9200/_cluster/health || exit 1
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 90s
-    
     deploy:
       resources:
         limits:
-          cpus: '${ES_CPU_LIMIT:-2}'
+          cpus: ${ES_CPU_LIMIT:-2}
           memory: ${ES_MEM_LIMIT:-4g}
         reservations:
-          cpus: '${ES_CPU_RESERVATION:-1}'
+          cpus: ${ES_CPU_RESERVATION:-1}
           memory: ${ES_MEM_RESERVATION:-2g}
-    
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ==================== Milvus ====================
+        max-size: 10m
+        max-file: '3'
   milvus:
     image: milvusdb/milvus:${MILVUS_VERSION:-v2.3.0}
     container_name: bisheng-milvus
-    command: ["milvus", "run", "standalone"]
+    command:
+    - milvus
+    - run
+    - standalone
     hostname: milvus
     restart: ${RESTART_POLICY:-unless-stopped}
-    
     environment:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-    
     volumes:
-      - milvus_data:/var/lib/milvus
-      - ./logs/milvus:/var/log/milvus
-    
+    - milvus_data:/var/lib/milvus
+    - ./logs/milvus:/var/log/milvus
     ports:
-      - "${MILVUS_PORT:-19530}:19530"
-      - "${MILVUS_HTTP_PORT:-9091}:9091"
-    
+    - ${MILVUS_PORT:-19530}:19530
+    - ${MILVUS_HTTP_PORT:-9091}:9091
     networks:
-      - bisheng-network
-    
+    - bisheng-network
     depends_on:
       etcd:
         condition: service_healthy
       minio:
         condition: service_healthy
-    
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:9091/healthz
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 90s
-    
     deploy:
       resources:
         limits:
-          cpus: '${MILVUS_CPU_LIMIT:-2}'
+          cpus: ${MILVUS_CPU_LIMIT:-2}
           memory: ${MILVUS_MEM_LIMIT:-4g}
         reservations:
-          cpus: '${MILVUS_CPU_RESERVATION:-1}'
+          cpus: ${MILVUS_CPU_RESERVATION:-1}
           memory: ${MILVUS_MEM_RESERVATION:-2g}
-    
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ==================== Backend ====================
+        max-size: 10m
+        max-file: '3'
   backend:
-    image: ${BACKEND_IMAGE:-dataelement/bisheng-backend:latest}
+    image: dataelement/bisheng-backend:latest
     container_name: bisheng-backend
     hostname: backend
     restart: ${RESTART_POLICY:-unless-stopped}
-    
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
@@ -361,18 +312,14 @@ services:
       BISHENG_ROLE: ${BISHENG_ROLE:-bisheng}
       LOG_LEVEL: ${BACKEND_LOG_LEVEL:-INFO}
       ENVIRONMENT: ${ENVIRONMENT:-development}
-    
     volumes:
-      - ./data/backend:/app/data
-      - ./logs/backend:/app/logs
-      - ./configs/bisheng:/app/config:ro
-    
+    - ./data/backend:/app/data
+    - ./logs/backend:/app/logs
+    - ./configs/bisheng:/app/config:ro
     ports:
-      - "${BACKEND_PORT:-3001}:3001"
-    
+    - ${BACKEND_PORT:-3001}:3001
     networks:
-      - bisheng-network
-    
+    - bisheng-network
     depends_on:
       postgres:
         condition: service_healthy
@@ -384,211 +331,198 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:3001/health
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 120s
-    
     deploy:
       resources:
         limits:
-          cpus: '${BACKEND_CPU_LIMIT:-2}'
+          cpus: ${BACKEND_CPU_LIMIT:-2}
           memory: ${BACKEND_MEM_LIMIT:-4g}
         reservations:
-          cpus: '${BACKEND_CPU_RESERVATION:-1}'
+          cpus: ${BACKEND_CPU_RESERVATION:-1}
           memory: ${BACKEND_MEM_RESERVATION:-2g}
-    
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ==================== Frontend ====================
+        max-size: 10m
+        max-file: '3'
   frontend:
-    image: ${FRONTEND_IMAGE:-dataelement/bisheng-frontend:latest}
+    image: dataelement/bisheng-frontend:latest
     container_name: bisheng-frontend
     hostname: frontend
     restart: ${RESTART_POLICY:-unless-stopped}
-    
     environment:
       VITE_API_URL: ${VITE_API_URL:-http://backend:3001}
       VITE_APP_TITLE: ${VITE_APP_TITLE:-Bisheng Enterprise}
-    
     volumes:
-      - ./data/frontend:/app/data
-      - ./logs/frontend:/app/logs
-    
+    - ./data/frontend:/app/data
+    - ./logs/frontend:/app/logs
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
-    
+    - ${FRONTEND_PORT:-3000}:3000
     networks:
-      - bisheng-network
-    
+    - bisheng-network
     depends_on:
       backend:
         condition: service_healthy
-    
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      test:
+      - CMD
+      - wget
+      - --quiet
+      - --tries=1
+      - --spider
+      - http://localhost:3000
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
-    
     deploy:
       resources:
         limits:
-          cpus: '${FRONTEND_CPU_LIMIT:-1}'
+          cpus: ${FRONTEND_CPU_LIMIT:-1}
           memory: ${FRONTEND_MEM_LIMIT:-1g}
         reservations:
-          cpus: '${FRONTEND_CPU_RESERVATION:-0.5}'
+          cpus: ${FRONTEND_CPU_RESERVATION:-0.5}
           memory: ${FRONTEND_MEM_RESERVATION:-512m}
-    
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ==================== Nginx ====================
+        max-size: 10m
+        max-file: '3'
   nginx:
     image: nginx:${NGINX_VERSION:-1.25-alpine}
     container_name: bisheng-nginx
     hostname: nginx
     restart: ${RESTART_POLICY:-unless-stopped}
-    
     volumes:
-      - ./configs/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./configs/nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./ssl:/etc/nginx/ssl:ro
-      - ./logs/nginx:/var/log/nginx
-    
+    - ./configs/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    - ./configs/nginx/conf.d:/etc/nginx/conf.d:ro
+    - ./ssl:/etc/nginx/ssl:ro
+    - ./logs/nginx:/var/log/nginx
     ports:
-      - "${NGINX_HTTP_PORT:-80}:80"
-      - "${NGINX_HTTPS_PORT:-443}:443"
-    
+    - ${NGINX_HTTP_PORT:-80}:80
+    - ${NGINX_HTTPS_PORT:-443}:443
     networks:
-      - bisheng-network
-    
+    - bisheng-network
     depends_on:
       frontend:
         condition: service_healthy
       backend:
         condition: service_healthy
-    
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost"]
+      test:
+      - CMD
+      - wget
+      - --quiet
+      - --tries=1
+      - --spider
+      - http://localhost
       interval: 30s
       timeout: 10s
       retries: 3
-    
     deploy:
       resources:
         limits:
-          cpus: '${NGINX_CPU_LIMIT:-1}'
+          cpus: ${NGINX_CPU_LIMIT:-1}
           memory: ${NGINX_MEM_LIMIT:-512m}
         reservations:
-          cpus: '${NGINX_CPU_RESERVATION:-0.25}'
+          cpus: ${NGINX_CPU_RESERVATION:-0.25}
           memory: ${NGINX_MEM_RESERVATION:-256m}
-    
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ==================== Prometheus ====================
+        max-size: 10m
+        max-file: '3'
   prometheus:
     image: prom/prometheus:${PROMETHEUS_VERSION:-v2.48.0}
     container_name: bisheng-prometheus
     hostname: prometheus
     restart: ${RESTART_POLICY:-unless-stopped}
-    
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
-      - '--web.enable-lifecycle'
-    
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --storage.tsdb.path=/prometheus
+    - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}
+    - --web.console.libraries=/usr/share/prometheus/console_libraries
+    - --web.console.templates=/usr/share/prometheus/consoles
+    - --web.enable-lifecycle
     volumes:
-      - ./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./configs/prometheus/rules:/etc/prometheus/rules:ro
-      - prometheus_data:/prometheus
-      - ./logs/prometheus:/var/log/prometheus
-    
+    - ./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    - ./configs/prometheus/rules:/etc/prometheus/rules:ro
+    - prometheus_data:/prometheus
+    - ./logs/prometheus:/var/log/prometheus
     ports:
-      - "${PROMETHEUS_PORT:-9090}:9090"
-    
+    - ${PROMETHEUS_PORT:-9090}:9090
     networks:
-      - bisheng-network
-    
+    - bisheng-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      test:
+      - CMD
+      - wget
+      - --quiet
+      - --tries=1
+      - --spider
+      - http://localhost:9090/-/healthy
       interval: 30s
       timeout: 10s
       retries: 3
-    
     deploy:
       resources:
         limits:
           cpus: '1'
           memory: 2g
-    
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ==================== Grafana ====================
+        max-size: 10m
+        max-file: '3'
   grafana:
     image: grafana/grafana:${GRAFANA_VERSION:-10.2.0}
     container_name: bisheng-grafana
     hostname: grafana
     restart: ${RESTART_POLICY:-unless-stopped}
-    
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: ${GRAFANA_ALLOW_SIGNUP:-false}
       GF_SERVER_ROOT_URL: http://localhost:${GRAFANA_PORT:-3002}
       GF_INSTALL_PLUGINS: redis-datasource
-    
     volumes:
-      - grafana_data:/var/lib/grafana
-      - ./configs/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./configs/grafana/dashboards:/var/lib/grafana/dashboards:ro
-      - ./logs/grafana:/var/log/grafana
-    
+    - grafana_data:/var/lib/grafana
+    - ./configs/grafana/provisioning:/etc/grafana/provisioning:ro
+    - ./configs/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    - ./logs/grafana:/var/log/grafana
     ports:
-      - "${GRAFANA_PORT:-3002}:3000"
-    
+    - ${GRAFANA_PORT:-3002}:3000
     networks:
-      - bisheng-network
-    
+    - bisheng-network
     depends_on:
-      - prometheus
-    
+    - prometheus
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test:
+      - CMD
+      - wget
+      - --quiet
+      - --tries=1
+      - --spider
+      - http://localhost:3000/api/health
       interval: 30s
       timeout: 10s
       retries: 3
-    
     deploy:
       resources:
         limits:
           cpus: '1'
           memory: 1g
-    
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: 10m
+        max-file: '3'
