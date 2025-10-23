@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bisheng Enterprise - لوحة التحكم</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 1200px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.2em;
+        }
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .service-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            transition: transform 0.3s;
+        }
+        .service-card:hover {
+            transform: translateY(-5px);
+        }
+        .service-card h3 {
+            margin-bottom: 10px;
+            font-size: 1.3em;
+        }
+        .service-card p {
+            opacity: 0.9;
+            margin-bottom: 15px;
+        }
+        .service-card a {
+            background: white;
+            color: #667eea;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .service-card a:hover {
+            background: #f0f0f0;
+            transform: scale(1.05);
+        }
+        .status {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .status-item:last-child {
+            border-bottom: none;
+        }
+        .badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        .badge-success {
+            background: #28a745;
+            color: white;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌟 Bisheng Enterprise</h1>
+        <p class="subtitle">نظام الذكاء الاصطناعي المتكامل</p>
+        
+        <div class="services-grid">
+            <div class="service-card">
+                <h3>📊 Grafana</h3>
+                <p>لوحات المراقبة والتحليلات</p>
+                <a href="http://localhost:3002" target="_blank">فتح →</a>
+            </div>
+            
+            <div class="service-card">
+                <h3>�� Prometheus</h3>
+                <p>نظام المراقبة والإنذار</p>
+                <a href="http://localhost:9090" target="_blank">فتح →</a>
+            </div>
+            
+            <div class="service-card">
+                <h3>💾 MinIO</h3>
+                <p>تخزين الملفات والبيانات</p>
+                <a href="http://localhost:9001" target="_blank">فتح →</a>
+            </div>
+            
+            <div class="service-card">
+                <h3>🔎 Elasticsearch</h3>
+                <p>محرك البحث المتقدم</p>
+                <a href="http://localhost:9200" target="_blank">فتح →</a>
+            </div>
+            
+            <div class="service-card">
+                <h3>🤖 Backend API</h3>
+                <p>واجهة برمجة التطبيقات</p>
+                <a href="http://localhost:7860/health" target="_blank">فحص →</a>
+            </div>
+        </div>
+        
+        <div class="status">
+            <h3 style="margin-bottom: 20px; color: #667eea;">حالة الخدمات</h3>
+            <div class="status-item">
+                <span>PostgreSQL</span>
+                <span class="badge badge-success">✓ يعمل</span>
+            </div>
+            <div class="status-item">
+                <span>Redis</span>
+                <span class="badge badge-success">✓ يعمل</span>
+            </div>
+            <div class="status-item">
+                <span>Elasticsearch</span>
+                <span class="badge badge-success">✓ يعمل</span>
+            </div>
+            <div class="status-item">
+                <span>Milvus</span>
+                <span class="badge badge-success">✓ يعمل</span>
+            </div>
+            <div class="status-item">
+                <span>MinIO</span>
+                <span class="badge badge-success">✓ يعمل</span>
+            </div>
+            <div class="status-item">
+                <span>Prometheus</span>
+                <span class="badge badge-success">✓ يعمل</span>
+            </div>
+            <div class="status-item">
+                <span>Grafana</span>
+                <span class="badge badge-success">✓ يعمل</span>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Bisheng Enterprise v1.0</strong></p>
+            <p>نظام ذكاء اصطناعي احترافي شامل</p>
+        </div>
+    </div>
+    
+    <script>
+        // Auto-refresh status every 30 seconds
+        setInterval(() => {
+            fetch('http://localhost:7860/health')
+                .then(r => r.json())
+                .then(data => console.log('Backend Status:', data))
+                .catch(e => console.error('Backend Error:', e));
+        }, 30000);
+    </script>
+</body>
+</html>

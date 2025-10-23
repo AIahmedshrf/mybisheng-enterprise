@@ -1,151 +1,280 @@
+# ============================================
+# Bisheng Enterprise - Base Services (Production Ready)
+# الخدمات الأساسية: Postgres, Redis, MinIO, Etcd, Milvus, Elasticsearch
+# ============================================
 
 networks:
   bisheng-network:
-    name: bisheng-network
+    name: ${NETWORK_NAME:-bisheng-prod-network}
     driver: bridge
+    ipam:
+      config:
+        - subnet: ${NETWORK_SUBNET:-172.30.0.0/16}
 
 volumes:
-  postgres_data:
-  redis_data:
-  minio_data:
-  etcd_data:
-  
+  postgres-data:
+  redis-data:
+  minio-data:
+  etcd-data:
+  milvus-data:
+  elasticsearch-data:
+
 services:
-  # PostgreSQL
   postgres:
-    image: postgres:15-alpine
+    image: postgres:${POSTGRES_VERSION:-15-alpine}
     container_name: bisheng-postgres
-    restart: unless-stopped
+    restart: ${RESTART_POLICY:-always}
     environment:
-      POSTGRES_DB: bisheng_production
-      POSTGRES_USER: bisheng_prod
-      POSTGRES_PASSWORD: CHANGE_THIS_TO_VERY_STRONG_PASSWORD_32_CHARS_MIN
-      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_DB: ${POSTGRES_DB:-bisheng_dev}  # تطابق مع السكربت
+      POSTGRES_USER: ${POSTGRES_USER:-bisheng_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-StrongPass1234_5678_ABCDEFGH}
+      POSTGRES_MAX_CONNECTIONS: ${POSTGRES_MAX_CONNECTIONS:-300}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./logs/postgresql:/var/log/postgresql
-    ports:
-      - "5432:5432"
+      - postgres-data:/var/lib/postgresql/data
+      - ./configs/postgresql/init-scripts:/docker-entrypoint-initdb.d  # دمج السكربت
     networks:
       - bisheng-network
+    command: >
+      postgres
+      -c shared_buffers=${POSTGRES_SHARED_BUFFERS:-4GB}
+      -c effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-12GB}
+      -c maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-1GB}
+      -c work_mem=${POSTGRES_WORK_MEM:-20MB}
+    deploy:
+      resources:
+        limits:
+          cpus: '${POSTGRES_CPU_LIMIT:-4}'
+          memory: ${POSTGRES_MEM_LIMIT:-8g}
+        reservations:
+          cpus: '${POSTGRES_CPU_RESERVATION:-2}'
+          memory: ${POSTGRES_MEM_RESERVATION:-4g}
+      labels:
+        - prometheus_scrape=true
+        - backup_volume=postgres-data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bisheng_prod"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bisheng_dev} -d ${POSTGRES_DB:-bisheng_dev}"]
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
+      retries: ${HEALTH_CHECK_RETRIES:-5}
+      start_period: ${HEALTH_CHECK_START_PERIOD:-120s}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: ${LOG_MAX_FILES:-30}
 
-  # Redis
   redis:
-    image: redis:7.2-alpine
+    image: redis:${REDIS_VERSION:-7.2-alpine}
     container_name: bisheng-redis
-    restart: unless-stopped
-    command: redis-server --requirepass CHANGE_THIS_REDIS_PASSWORD_STRONG_32_CHARS
-    volumes:
-      - redis_data:/data
-    ports:
-      - "6379:6379"
-    networks:
-      - bisheng-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Etcd
-  etcd:
-    image: bitnamilegacy/etcd:3.5
-    container_name: bisheng-etcd
-    restart: unless-stopped
+    restart: ${RESTART_POLICY:-always}
     environment:
-      ALLOW_NONE_AUTHENTICATION: "yes"
-      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-RedisStrongPass1234_5678_ijkl}
     volumes:
-      - etcd_data:/bitnami/etcd
-    ports:
-      - "2379:2379"
+      - redis-data:/data
     networks:
       - bisheng-network
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-RedisStrongPass1234_5678_ijkl}
+      --maxmemory ${REDIS_MAXMEMORY:-8gb}
+      --maxmemory-policy ${REDIS_MAXMEMORY_POLICY:-allkeys-lru}
+      --save ${REDIS_SAVE_ENABLED:-60 1}
+    deploy:
+      resources:
+        limits:
+          cpus: '${REDIS_CPU_LIMIT:-2}'
+          memory: ${REDIS_MEM_LIMIT:-8g}
+        reservations:
+          cpus: '${REDIS_CPU_RESERVATION:-1}'
+          memory: ${REDIS_MEM_RESERVATION:-4g}
+      labels:
+        - prometheus_scrape=true
+        - backup_volume=redis-data
     healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-RedisStrongPass1234_5678_ijkl}", "ping"]
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
+      retries: ${HEALTH_CHECK_RETRIES:-5}
+      start_period: ${HEALTH_CHECK_START_PERIOD:-120s}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: ${LOG_MAX_FILES:-30}
 
-  # MinIO
   minio:
-    image: minio/minio:latest
+    image: minio/minio:${MINIO_VERSION:-latest}
     container_name: bisheng-minio
-    restart: unless-stopped
+    restart: ${RESTART_POLICY:-always}
     environment:
-      MINIO_ROOT_USER: CHANGE_THIS_MINIO_USER
-      MINIO_ROOT_PASSWORD: CHANGE_THIS_MINIO_PASSWORD_MIN_32_CHARS
-    command: server /data --console-address ":9001"
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-bisheng_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-MinioSecurePass9876_5432_XYZ}
     volumes:
-      - minio_data:/data
+      - minio-data:/data
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
     networks:
       - bisheng-network
+    command: server /data --console-address ":9001"
+    deploy:
+      resources:
+        limits:
+          cpus: '${MINIO_CPU_LIMIT:-2}'
+          memory: ${MINIO_MEM_LIMIT:-4g}
+        reservations:
+          cpus: '${MINIO_CPU_RESERVATION:-1}'
+          memory: ${MINIO_MEM_RESERVATION:-2g}
+      labels:
+        - prometheus_scrape=true
+        - backup_volume=minio-data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
+      retries: ${HEALTH_CHECK_RETRIES:-5}
+      start_period: ${HEALTH_CHECK_START_PERIOD:-120s}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: ${LOG_MAX_FILES:-30}
 
-  # Elasticsearch
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
-    container_name: bisheng-elasticsearch
-    restart: unless-stopped
-    user: "1000:1000"
+  etcd:
+    image: quay.io/coreos/etcd:${ETCD_VERSION:-v3.5.5}
+    container_name: bisheng-etcd
+    restart: ${RESTART_POLICY:-always}
     environment:
-      - discovery.type=single-node
-      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
-      - xpack.security.enabled=true
-      - xpack.security.http.ssl.enabled=false
-      - ELASTIC_PASSWORD=CHANGE_THIS_ELASTIC_PASSWORD_STRONG_32_CHARS
-      - bootstrap.memory_lock=false
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: 1000
+      ETCD_QUOTA_BACKEND_BYTES: 4294967296
+      ETCD_SNAPSHOT_COUNT: 50000
     volumes:
-      - ./data/elasticsearch:/usr/share/elasticsearch/data
-    ports:
-      - "9200:9200"
+      - etcd-data:/etcd
     networks:
       - bisheng-network
+    command: [
+      "etcd",
+      "-name", "etcd0",
+      "-advertise-client-urls=http://127.0.0.1:2379",
+      "-listen-client-urls=http://0.0.0.0:2379",
+      "-initial-advertise-peer-urls=http://127.0.0.1:2380",
+      "-listen-peer-urls=http://0.0.0.0:2380",
+      "-initial-cluster=etcd0=http://127.0.0.1:2380",
+      "-initial-cluster-token=etcd-cluster",
+      "-data-dir=/etcd"
+    ]
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2g
+        reservations:
+          cpus: '0.5'
+          memory: 1g
+      labels:
+        - prometheus_scrape=true
+        - backup_volume=etcd-data
     healthcheck:
-      test: ["CMD-SHELL", "curl -u elastic:CHANGE_THIS_ELASTIC_PASSWORD_STRONG_32_CHARS -f http://localhost:9200/_cluster/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 90s
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
+      retries: ${HEALTH_CHECK_RETRIES:-5}
+      start_period: ${HEALTH_CHECK_START_PERIOD:-120s}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: ${LOG_MAX_FILES:-30}
 
-  # Milvus
   milvus:
-    image: milvusdb/milvus:v2.3.0
+    image: milvusdb/milvus:${MILVUS_VERSION:-v2.3.0}
     container_name: bisheng-milvus
-    command: ["milvus", "run", "standalone"]
-    restart: unless-stopped
+    restart: ${RESTART_POLICY:-always}
     environment:
-      ETCD_ENDPOINTS: etcd:2379
-      MINIO_ADDRESS: minio:9000
-      MINIO_ACCESS_KEY: CHANGE_THIS_MINIO_USER
-      MINIO_SECRET_KEY: CHANGE_THIS_MINIO_PASSWORD_MIN_32_CHARS
+      ETCD_ENDPOINTS: ${ETCD_ENDPOINTS:-etcd:2379}
+      MINIO_ADDRESS: ${MINIO_HOST:-minio}:9000
+      MINIO_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-bisheng_admin}
+      MINIO_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-MinioSecurePass9876_5432_XYZ}
     volumes:
-      - ./data/milvus:/var/lib/milvus
+      - milvus-data:/var/lib/milvus
     ports:
-      - "19530:19530"
-      - "9091:9091"
+      - "${MILVUS_PORT:-19530}:19530"
+      - "${MILVUS_HTTP_PORT:-9091}:9091"
     networks:
       - bisheng-network
+    command: ["milvus", "run", "standalone"]
     depends_on:
       etcd:
         condition: service_healthy
       minio:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '${MILVUS_CPU_LIMIT:-4}'
+          memory: ${MILVUS_MEM_LIMIT:-8g}
+        reservations:
+          cpus: '${MILVUS_CPU_RESERVATION:-2}'
+          memory: ${MILVUS_MEM_RESERVATION:-4g}
+      labels:
+        - prometheus_scrape=true
+        - backup_volume=milvus-data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 90s
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
+      retries: ${HEALTH_CHECK_RETRIES:-5}
+      start_period: 180s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: ${LOG_MAX_FILES:-30}
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ES_VERSION:-8.11.0}
+    container_name: bisheng-elasticsearch
+    restart: ${RESTART_POLICY:-always}
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: ${ES_SECURITY_ENABLED:-true}
+      ES_JAVA_OPTS: -Xms1g -Xmx1g  # صيغة نظيفة بدون اقتباس داخلي
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:-ElasticStrongPass1234_5678_MNO}
+      bootstrap.password: ${ES_BOOTSTRAP_PASSWORD:-BootstrapSecurePass9876_5432_PQR}
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - "${ES_PORT:-9200}:9200"
+    networks:
+      - bisheng-network
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    deploy:
+      resources:
+        limits:
+          cpus: '${ES_CPU_LIMIT:-2}'
+          memory: ${ES_MEM_LIMIT:-4g}
+        reservations:
+          cpus: '${ES_CPU_RESERVATION:-1}'
+          memory: ${ES_MEM_RESERVATION:-2g}
+      labels:
+        - prometheus_scrape=true
+        - backup_volume=elasticsearch-data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f -u elastic:${ELASTIC_PASSWORD:-ElasticStrongPass1234_5678_MNO} http://localhost:9200/_cluster/health || exit 1"]
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
+      retries: ${HEALTH_CHECK_RETRIES:-5}
+      start_period: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: ${LOG_MAX_FILES:-30}

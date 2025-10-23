@@ -1,0 +1,55 @@
+networks:
+  bisheng-network:
+    external: true
+    name: bisheng-network
+
+services:
+  backend-simple:
+    image: python:3.10-slim
+    container_name: bisheng-backend-simple
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "
+      apt-get update && apt-get install -y gcc libpq-dev &&
+      pip install fastapi uvicorn psycopg2-binary redis &&
+      cat > main.py << 'EOF'
+      from fastapi import FastAPI
+      import psycopg2, redis
+      app = FastAPI()
+      @app.get('/')
+      def root():
+          return {'status': 'Bisheng Backend', 'version': '1.0'}
+      @app.get('/health')
+      def health():
+          try:
+              conn = psycopg2.connect(host='postgres', database='bisheng_production', user='bisheng_prod', password='CHANGE_THIS_TO_VERY_STRONG_PASSWORD_32_CHARS_MIN')
+              conn.close()
+              pg = 'ok'
+          except: pg = 'error'
+          try:
+              r = redis.Redis(host='redis', port=6379, password='CHANGE_THIS_REDIS_PASSWORD_STRONG_32_CHARS')
+              r.ping()
+              rd = 'ok'
+          except: rd = 'error'
+          return {'backend': 'ok', 'postgres': pg, 'redis': rd}
+      EOF
+      python -m uvicorn main:app --host 0.0.0.0 --port 7860
+      "
+    ports:
+      - "7860:7860"
+    networks:
+      - bisheng-network
+    environment:
+      PYTHONUNBUFFERED: "1"
+
+  frontend-simple:
+    image: nginx:alpine
+    container_name: bisheng-frontend-simple
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    networks:
+      - bisheng-network
+    volumes:
+      - ./frontend-html:/usr/share/nginx/html:ro

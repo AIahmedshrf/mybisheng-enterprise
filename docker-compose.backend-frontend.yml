@@ -1,0 +1,259 @@
+# ============================================
+# Bisheng Enterprise - Backend & Frontend Services
+# تشغيل Backend, Frontend, وNginx للإنتاج
+# ============================================
+
+networks:
+  bisheng-network:
+    external: true
+    name: ${NETWORK_NAME:-bisheng-prod-network}
+
+volumes:
+  backend-data:
+  frontend-data:
+
+services:
+  backend:
+    build:
+      context: ./custom-images/backend
+      dockerfile: Dockerfile
+    container_name: bisheng-backend
+    restart: ${RESTART_POLICY:-always}
+    environment:
+      - BISHENG_EDITION=${BISHENG_EDITION:-Enterprise}
+      - BACKEND_HOST=${BACKEND_HOST:-0.0.0.0}
+      - BACKEND_PORT=${BACKEND_PORT:-3001}
+      - BACKEND_WORKERS=${BACKEND_WORKERS:-8}
+      - BACKEND_TIMEOUT=${BACKEND_TIMEOUT:-900}
+      - BACKEND_LOG_LEVEL=${BACKEND_LOG_LEVEL:-WARNING}
+      - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_here}
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-bisheng_dev}
+      - POSTGRES_USER=${POSTGRES_USER:-bisheng_dev}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-StrongPass1234_5678_ABCDEFGH}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-RedisStrongPass1234_5678_ijkl}
+      - ES_HOST=${ES_HOST:-elasticsearch}
+      - ES_PORT=${ES_PORT:-9200}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-ElasticStrongPass1234_5678_MNO}
+      - MILVUS_HOST=${MILVUS_HOST:-milvus}
+      - MILVUS_PORT=${MILVUS_PORT:-19530}
+      - MINIO_HOST=${MINIO_HOST:-minio}
+      - MINIO_PORT=${MINIO_PORT:-9000}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-bisheng_admin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-MinioSecurePass9876_5432_XYZ}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-your_openai_api_key}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-your_anthropic_api_key}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-your_google_api_key}
+      - USE_LOCAL_MODELS=${USE_LOCAL_MODELS:-true}
+      - LOCAL_MODEL_PATH=/models
+      - EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+      - LLM_MODEL=chatglm3-6b
+      - FT_ENABLED=${FT_ENABLED:-false}
+      - OFFICE_ENABLED=${OFFICE_ENABLED:-true}
+      - ML_ENABLED=${ML_ENABLED:-true}
+    volumes:
+      - backend-data:/app/data
+      - ./configs/bisheng:/app/config
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    networks:
+      - bisheng-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    entrypoint: ["/app/entrypoint-enterprise.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "/app/healthcheck.sh"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '${BACKEND_CPU_LIMIT:-4}'
+          memory: ${BACKEND_MEM_LIMIT:-8g}
+        reservations:
+          cpus: '${BACKEND_CPU_RESERVATION:-2}'
+          memory: ${BACKEND_MEM_RESERVATION:-4g}
+      labels:
+        - prometheus_scrape=true
+        - backup_volume=backend-data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "30"
+
+  backend-worker:
+    build:
+      context: ./custom-images/backend
+      dockerfile: Dockerfile
+    container_name: bisheng-backend-worker
+    restart: ${RESTART_POLICY:-always}
+    environment:
+      - BACKEND_WORKERS=1
+      - BISHENG_EDITION=${BISHENG_EDITION:-Enterprise}
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-bisheng_dev}
+      - POSTGRES_USER=${POSTGRES_USER:-bisheng_dev}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-StrongPass1234_5678_ABCDEFGH}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-RedisStrongPass1234_5678_ijkl}
+      - ES_HOST=${ES_HOST:-elasticsearch}
+      - ES_PORT=${ES_PORT:-9200}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-ElasticStrongPass1234_5678_MNO}
+      - MILVUS_HOST=${MILVUS_HOST:-milvus}
+      - MILVUS_PORT=${MILVUS_PORT:-19530}
+      - MINIO_HOST=${MINIO_HOST:-minio}
+      - MINIO_PORT=${MINIO_PORT:-9000}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-bisheng_admin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-MinioSecurePass9876_5432_XYZ}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-your_openai_api_key}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-your_anthropic_api_key}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-your_google_api_key}
+      - USE_LOCAL_MODELS=${USE_LOCAL_MODELS:-true}
+      - LOCAL_MODEL_PATH=/models
+      - EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+      - LLM_MODEL=chatglm3-6b
+      - FT_ENABLED=${FT_ENABLED:-false}
+      - OFFICE_ENABLED=${OFFICE_ENABLED:-true}
+      - ML_ENABLED=${ML_ENABLED:-true}
+    volumes:
+      - backend-data:/app/data
+      - ./configs/bisheng:/app/config
+    networks:
+      - bisheng-network
+    depends_on:
+      backend:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    entrypoint: ["/app/entrypoint-enterprise.sh worker"]
+    healthcheck:
+      test: ["CMD-SHELL", "/app/healthcheck.sh"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4g
+        reservations:
+          cpus: '1'
+          memory: 2g
+      labels:
+        - prometheus_scrape=true
+        - backup_volume=backend-data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "30"
+
+  frontend:
+    build:
+      context: ./custom-images/frontend
+      dockerfile: Dockerfile
+    container_name: bisheng-frontend
+    restart: ${RESTART_POLICY:-always}
+    environment:
+      - FRONTEND_PORT=${FRONTEND_PORT:-3000}
+      - VITE_API_URL=http://bisheng-backend:3001
+      - VITE_APP_TITLE=${VITE_APP_TITLE:-Bisheng Enterprise}
+    volumes:
+      - frontend-data:/app/data
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    networks:
+      - bisheng-network
+    depends_on:
+      backend:
+        condition: service_healthy
+    entrypoint: ["/app/entrypoint-frontend.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "/app/healthcheck.sh"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '${FRONTEND_CPU_LIMIT:-2}'
+          memory: ${FRONTEND_MEM_LIMIT:-2g}
+        reservations:
+          cpus: '${FRONTEND_CPU_RESERVATION:-1}'
+          memory: ${FRONTEND_MEM_RESERVATION:-1g}
+      labels:
+        - prometheus_scrape=true
+        - backup_volume=frontend-data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "30"
+
+  nginx:
+    image: nginx:${NGINX_VERSION:-1.25-alpine}
+    container_name: bisheng-nginx
+    restart: ${RESTART_POLICY:-always}
+    volumes:
+      - ./configs/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./configs/nginx/conf.d/bisheng.conf:/etc/nginx/conf.d/bisheng.conf
+      - ./custom-images/frontend/security-headers.conf:/etc/nginx/security-headers.conf
+      - ./ssl:/etc/nginx/ssl
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    networks:
+      - bisheng-network
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '${NGINX_CPU_LIMIT:-2}'
+          memory: ${NGINX_MEM_LIMIT:-1g}
+        reservations:
+          cpus: '${NGINX_CPU_RESERVATION:-0.5}'
+          memory: ${NGINX_MEM_RESERVATION:-512m}
+      labels:
+        - prometheus_scrape=true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "30"

@@ -1,58 +1,95 @@
-# Prometheus + Grafana للمراقبة
+# ============================================
+# Bisheng Enterprise - Monitoring Infrastructure
+# Prometheus + Grafana مع لوحات جاهزة للمراقبة
+# ============================================
 
 networks:
   bisheng-network:
     external: true
-    name: bisheng-network
+    name: ${NETWORK_NAME:-bisheng-prod-network}
 
 volumes:
-  prometheus_data:
-  grafana_data:
+  prometheus-data:
+  grafana-data:
 
 services:
-  # Prometheus
   prometheus:
-    image: prom/prometheus:v2.48.0
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v2.48.0}
     container_name: bisheng-prometheus
-    restart: unless-stopped
+    restart: ${RESTART_POLICY:-always}
+    volumes:
+      - prometheus-data:/prometheus
+      - ../configs/prometheus:/etc/prometheus  # نسبي للجذر
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=90d'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-90d}'
       - '--web.enable-lifecycle'
-    volumes:
-      - ../configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
     ports:
-      - "9090:9090"
+      - "${PROMETHEUS_PORT:-9090}:9090"
     networks:
       - bisheng-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2g
+        reservations:
+          cpus: '0.5'
+          memory: 1g
+      labels:
+        - backup_volume=prometheus-data
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
+      retries: ${HEALTH_CHECK_RETRIES:-5}
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: ${LOG_MAX_FILES:-30}
 
-  # Grafana
   grafana:
-    image: grafana/grafana:10.2.0
+    image: grafana/grafana:${GRAFANA_VERSION:-10.2.0}
     container_name: bisheng-grafana
-    restart: unless-stopped
+    restart: ${RESTART_POLICY:-always}
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: CHANGE_THIS_GRAFANA_PASSWORD
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-GrafanaSecurePass1234_5678}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_AUTH_ALLOW_SIGN_UP: ${GRAFANA_ALLOW_SIGNUP:-false}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_EXPLORE_ENABLED: "true"
     volumes:
-      - grafana_data:/var/lib/grafana
-      - ../configs/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+      - ../configs/grafana:/etc/grafana/provisioning  # لوحات جاهزة
     ports:
-      - "3002:3000"
+      - "${GRAFANA_PORT:-3002}:3000"
     networks:
       - bisheng-network
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1g
+        reservations:
+          cpus: '0.5'
+          memory: 512m
+      labels:
+        - backup_volume=grafana-data
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
+      retries: ${HEALTH_CHECK_RETRIES:-5}
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: ${LOG_MAX_FILES:-30}

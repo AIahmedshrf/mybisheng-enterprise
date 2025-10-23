@@ -10,12 +10,12 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 echo -e "${BLUE}📦 المرحلة 1: بدء الخدمات الأساسية${NC}"
-docker-compose -f base/docker-compose.base.yml up -d
+docker compose -f base/docker-compose.base.yml up -d
 echo -e "${GREEN}✅ الخدمات الأساسية بدأت${NC}"
 
 echo ""
 echo -e "${BLUE}📊 المرحلة 2: بدء خدمات المراقبة${NC}"
-docker-compose -f infrastructure/docker-compose.monitoring.yml up -d
+docker compose -f infrastructure/docker-compose.monitoring.yml up -d
 echo -e "${GREEN}✅ خدمات المراقبة بدأت${NC}"
 
 echo ""
